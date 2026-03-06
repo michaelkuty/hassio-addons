@@ -9,7 +9,7 @@ ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 RUN apk add --no-cache git
-ARG CACHE_BUST=3
+ARG CACHE_BUST=4
 RUN git clone --branch feat/add-oidc-better-auth-support --depth 1 \
     https://github.com/michaelkuty/seerr.git /app
 WORKDIR /app
