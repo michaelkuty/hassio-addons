@@ -1,13 +1,44 @@
 #============================#
-#  ALEXBELGIUM'S DOCKERFILE  #
+#  Build Seerr from source   #
 #============================#
-#           _.------.
-#       _.-`    ('>.-`"""-.
-# '.--'`       _'`   _ .--.)
-#    -'         '-.-';`   `
-#    ' -      _.'  ``'--.
-#        '---`    .-'""`
-#               /`
+
+FROM node:22-alpine AS seerr-base
+ARG TARGETPLATFORM
+ENV TARGETPLATFORM=${TARGETPLATFORM:-linux/amd64}
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
+RUN apk add --no-cache git
+RUN git clone --branch feat/add-oidc-better-auth-support --depth 1 \
+    https://github.com/coolguy1771/seerr.git /app
+WORKDIR /app
+
+FROM seerr-base AS seerr-prod-deps
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store CI=true pnpm install --prod --frozen-lockfile
+
+FROM seerr-base AS seerr-build
+RUN \
+  case "${TARGETPLATFORM}" in \
+  'linux/arm64' | 'linux/arm/v7') \
+  apk update && \
+  apk add --no-cache python3 make g++ gcc libc6-compat bash && \
+  npm install --global node-gyp \
+  ;; \
+  esac
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store CYPRESS_INSTALL_BINARY=0 pnpm install --frozen-lockfile
+RUN pnpm build
+RUN rm -rf .next/cache
+
+FROM node:22-alpine AS seerr-runtime
+ENV NODE_ENV=production
+RUN apk add --no-cache tzdata
+WORKDIR /app
+COPY --from=seerr-base /app /app
+COPY --from=seerr-prod-deps /app/node_modules ./node_modules
+COPY --from=seerr-build /app/.next ./.next
+COPY --from=seerr-build /app/dist ./dist
+RUN mkdir -p config && touch config/DOCKER
+
 #=== Home Assistant Addon ===#
 
 #################
@@ -16,7 +47,7 @@
 
 ARG BUILD_FROM
 ARG BUILD_VERSION
-FROM ${BUILD_FROM}
+FROM seerr-runtime
 ENV BASHIO_VERSION=1.29.1
 
 ##################
