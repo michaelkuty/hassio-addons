@@ -10,7 +10,7 @@ ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 RUN apk add --no-cache git
 RUN git clone --branch feat/add-oidc-better-auth-support --depth 1 \
-    https://github.com/coolguy1771/seerr.git /app
+    https://github.com/michaelkuty/seerr.git /app
 WORKDIR /app
 
 FROM seerr-base AS seerr-prod-deps
